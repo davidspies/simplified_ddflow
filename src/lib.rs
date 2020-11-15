@@ -135,10 +135,10 @@ pub struct ReadRef<D> {
 }
 
 impl<T> ReadRef<T> {
-    pub fn read<'b>(
-        &'b self,
-        ContextOutput(context): &'b ContextOutput, // Although not necessary to compile, this lifetime annotation is important since it prevents deadlock by making sure the output gets cleaned up before the next commit call.
-    ) -> RwLockReadGuard<'b, T> {
+    pub fn read<'c>(
+        &'c self,
+        ContextOutput(context): &'c ContextOutput, // Although not necessary to compile, this lifetime annotation is important since it prevents deadlock by making sure the output ref gets dropped before the next commit call.
+    ) -> RwLockReadGuard<'c, T> {
         let mut worker = context.worker.lock().unwrap();
         while self.handle.less_than(&context.current_step) {
             worker.step();
