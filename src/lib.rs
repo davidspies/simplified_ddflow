@@ -116,10 +116,11 @@ impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Monoid> CreateOutput<D
 {
     fn create_output(&self) -> ReadRef<HashMap<D, R>> {
         let data = Arc::new(RwLock::new(HashMap::new()));
-        let writer_ref = data.clone();
+        let writer_ref = Arc::downgrade(&data);
         self.inspect(move |(d, _, r)| {
-            let mut data = writer_ref.write().unwrap();
-            apply_update(&mut data, d.clone(), r.clone());
+            if let Some(data) = writer_ref.upgrade() {
+                apply_update(&mut data.write().unwrap(), d.clone(), r.clone())
+            }
         });
         ReadRef {
             data,
