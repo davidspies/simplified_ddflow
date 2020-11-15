@@ -22,14 +22,13 @@ where
     timely::execute_from_args(iter, move |worker| {
         let mut register = InputRegister::new();
         let structures = worker.dataflow(|scope| setup(scope, &mut register));
-        execute(
-            Context {
-                worker,
-                register,
-                current_step: 0,
-            },
-            structures,
-        )
+        let mut context = Context {
+            worker,
+            register,
+            current_step: 0,
+        };
+        context.commit();
+        execute(context, structures)
     })
 }
 
