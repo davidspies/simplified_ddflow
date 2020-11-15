@@ -93,10 +93,10 @@ pub struct Context<'a> {
 
 // We're pretending that the input data to be commited is stored in this ContextInput. Hence the dummy lifetimes.
 pub struct ContextInput<'b>(PhantomData<&'b ()>);
-pub struct ContextOutput<'a, 'b>(&'b Context<'a>);
+pub struct ContextOutput<'b, 'a>(&'b Context<'a>);
 
 impl<'a> Context<'a> {
-    pub fn get_io<'b>(&'b mut self) -> (ContextInput<'b>, ContextOutput<'a, 'b>) {
+    pub fn get_io<'b>(&'b mut self) -> (ContextInput<'b>, ContextOutput<'b, 'a>) {
         (ContextInput(PhantomData), ContextOutput(self))
     }
     pub fn commit(&mut self) {
