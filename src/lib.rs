@@ -101,12 +101,8 @@ impl<'a> Context<'a> {
     }
     pub fn commit(&mut self) {
         self.current_step += 1;
-        let mut reg_refs: Vec<_> = (&self.register.0)
-            .into_iter()
-            .map(|r| r.lock().unwrap())
-            .collect();
-        for r in &mut reg_refs {
-            r.advance_to(self.current_step);
+        for r in &mut self.register.0 {
+            r.lock().unwrap().advance_to(self.current_step);
         }
     }
 }
