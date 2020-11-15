@@ -109,23 +109,40 @@ impl<'a> Context<'a> {
 
 pub trait CreateOutput<D, R> {
     fn create_output(&self) -> ReadRef<HashMap<D, R>>;
+    fn create_count_output(&self) -> ReadRef<R>;
 }
 
-impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Monoid> CreateOutput<D, R>
+fn create_updater<
+    G: Scope<Timestamp = usize>,
+    D: Data,
+    R: Semigroup,
+    Y: Default + 'static,
+    F: FnMut(&mut Y, &D, &R) + 'static,
+>(
+    rel: &Collection<G, D, R>,
+    mut f: F,
+) -> ReadRef<Y> {
+    let data = Arc::new(RwLock::new(Default::default()));
+    let writer_ref = Arc::downgrade(&data);
+    rel.inspect(move |(d, _, r)| {
+        if let Some(data) = writer_ref.upgrade() {
+            f(&mut data.write().unwrap(), d, r)
+        }
+    });
+    ReadRef {
+        data,
+        handle: rel.probe(),
+    }
+}
+
+impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Monoid> CreateOutput<D, R>
     for Collection<G, D, R>
 {
     fn create_output(&self) -> ReadRef<HashMap<D, R>> {
-        let data = Arc::new(RwLock::new(HashMap::new()));
-        let writer_ref = Arc::downgrade(&data);
-        self.inspect(move |(d, _, r)| {
-            if let Some(data) = writer_ref.upgrade() {
-                apply_update(&mut data.write().unwrap(), d.clone(), r.clone())
-            }
-        });
-        ReadRef {
-            data,
-            handle: self.probe(),
-        }
+        create_updater(self, |data, d, r| apply_update(data, d.clone(), r.clone()))
+    }
+    fn create_count_output(&self) -> ReadRef<R> {
+        create_updater(self, |data, _, r| *data += r)
     }
 }
 
