@@ -91,7 +91,7 @@ pub struct Context<'a> {
     register: InputRegister,
 }
 
-// We're pretending that the input data to be commited is stored in this ContextInput. Hence the dummy lifetimes.
+// We're pretending that the input data to be commited is stored in this ContextInput. Hence the dummy lifetime.
 pub struct ContextInput<'b>(PhantomData<&'b ()>);
 pub struct ContextOutput<'b, 'a>(&'b Context<'a>);
 
