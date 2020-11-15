@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use timely::communication::{Allocator, WorkerGuards};
 use timely::dataflow::operators::probe::Handle;
 use timely::dataflow::scopes::{Child, Scope};
-use timely::{progress::Timestamp, worker::Worker, Data};
+use timely::{worker::Worker, Data};
 
 pub fn execute_from_args<I, T1, T2: Send + Sync, F, G>(
     iter: I,
@@ -98,7 +98,7 @@ impl<'a> Context<'a> {
     // Could potentially deadlock if another read was opened before calling commit and hasn't closed yet
     fn read_deadlocking<'c, 'b: 'c, D, R>(
         &mut self,
-        r: &'b ReadRef<HashMap<D, R>, usize>,
+        r: &'b ReadRef<HashMap<D, R>>,
     ) -> RwLockReadGuard<'c, HashMap<D, R>> {
         while r.handle.less_than(&self.current_step) {
             self.worker.step();
@@ -108,7 +108,7 @@ impl<'a> Context<'a> {
     /// Open a reference to a single collection output without creating a reader
     pub fn read<'c, 'b: 'c, D, R>(
         &'c mut self, // Although not necessary to compile, this lifetime annotation makes deadlock impossible since commit can't be called while the result is in scope
-        r: &'b ReadRef<HashMap<D, R>, usize>,
+        r: &'b ReadRef<HashMap<D, R>>,
     ) -> RwLockReadGuard<'c, HashMap<D, R>> {
         self.read_deadlocking(r)
     }
@@ -134,20 +134,20 @@ pub struct Reader<'c, 'a>(&'c mut Context<'a>);
 impl<'c, 'a> Reader<'c, 'a> {
     pub fn read<'b: 'c, D, R>(
         &mut self,
-        r: &'b ReadRef<HashMap<D, R>, usize>,
+        r: &'b ReadRef<HashMap<D, R>>,
     ) -> RwLockReadGuard<'c, HashMap<D, R>> {
         self.0.read_deadlocking(r)
     }
 }
 
-pub trait CreateOutput<D, R, T: Timestamp> {
-    fn create_output(&self) -> ReadRef<HashMap<D, R>, T>;
+pub trait CreateOutput<D, R> {
+    fn create_output(&self) -> ReadRef<HashMap<D, R>>;
 }
 
-impl<G: Scope, D: Data + Eq + Hash, R: Monoid> CreateOutput<D, R, G::Timestamp>
+impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Monoid> CreateOutput<D, R>
     for Collection<G, D, R>
 {
-    fn create_output(&self) -> ReadRef<HashMap<D, R>, G::Timestamp> {
+    fn create_output(&self) -> ReadRef<HashMap<D, R>> {
         let data = Arc::new(RwLock::new(HashMap::new()));
         let writer_ref = data.clone();
         self.inspect(move |(d, _, r)| {
@@ -161,9 +161,9 @@ impl<G: Scope, D: Data + Eq + Hash, R: Monoid> CreateOutput<D, R, G::Timestamp>
     }
 }
 
-pub struct ReadRef<D, T: Timestamp> {
+pub struct ReadRef<D> {
     data: Arc<RwLock<D>>,
-    handle: Handle<T>,
+    handle: Handle<usize>,
 }
 
 fn apply_update<D: Eq + Hash, R: Semigroup>(data: &mut HashMap<D, R>, k: D, v: R) {
