@@ -64,7 +64,7 @@ pub fn apply_hash_update<D: Eq + Hash, R: SemigroupWrapper>(
     match data.entry(k) {
         hash_map::Entry::Occupied(mut e) => {
             let val = e.get_mut();
-            let mut valw = R::wrap(mem::replace(val, Default::default()));
+            let mut valw = R::wrap(mem::take(val));
             valw.incorporate(v);
             if valw.is_zero() {
                 e.remove_entry();
@@ -89,7 +89,7 @@ pub fn apply_btree_update<D: Ord, R: SemigroupWrapper>(
     match data.entry(k) {
         btree_map::Entry::Occupied(mut e) => {
             let val = e.get_mut();
-            let mut valw = R::wrap(mem::replace(val, Default::default()));
+            let mut valw = R::wrap(mem::take(val));
             valw.incorporate(v);
             if valw.is_zero() {
                 e.remove_entry();
