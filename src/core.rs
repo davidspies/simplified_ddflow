@@ -97,6 +97,12 @@ impl<'a> Context<'a> {
     pub fn get_io<'b>(&'b mut self) -> (ContextInput<'b>, ContextOutput<'b, 'a>) {
         (ContextInput(PhantomData), ContextOutput(self))
     }
+    pub fn get_input<'b>(&'b mut self) -> ContextInput<'b> {
+        ContextInput(PhantomData)
+    }
+    pub fn get_output<'b>(&'b self) -> ContextOutput<'b, 'a> {
+        ContextOutput(self)
+    }
     pub fn commit(&mut self) {
         self.current_step += 1;
         for r in &mut self.register.0 {
