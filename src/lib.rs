@@ -1,6 +1,6 @@
-use differential_dataflow::difference::{Monoid, Semigroup};
+use differential_dataflow::difference::Semigroup;
 use differential_dataflow::{input, Collection};
-use std::collections::hash_map::{Entry, HashMap};
+use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -107,8 +107,13 @@ impl<'a> Context<'a> {
     }
 }
 
-pub trait CreateOutput<D, R> {
-    fn create_output(&self) -> ReadRef<HashMap<D, R>>;
+pub trait CreateHashedOutput<D, R> {
+    fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>>;
+}
+pub trait CreateOrderedOutput<D, R> {
+    fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>>;
+}
+pub trait CreateCountOutput<D, R> {
     fn create_count_output(&self) -> ReadRef<R>;
 }
 
@@ -135,12 +140,27 @@ fn create_updater<
     }
 }
 
-impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Monoid> CreateOutput<D, R>
+impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Semigroup> CreateHashedOutput<D, R>
     for Collection<G, D, R>
 {
-    fn create_output(&self) -> ReadRef<HashMap<D, R>> {
-        create_updater(self, |data, d, r| apply_update(data, d.clone(), r.clone()))
+    fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>> {
+        create_updater(self, |data, d, r| {
+            apply_hash_update(data, d.clone(), r.clone())
+        })
     }
+}
+impl<G: Scope<Timestamp = usize>, D: Data + Ord, R: Semigroup> CreateOrderedOutput<D, R>
+    for Collection<G, D, R>
+{
+    fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>> {
+        create_updater(self, |data, d, r| {
+            apply_btree_update(data, d.clone(), r.clone())
+        })
+    }
+}
+impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOutput<D, R>
+    for Collection<G, D, R>
+{
     fn create_count_output(&self) -> ReadRef<R> {
         create_updater(self, |data, _, r| *data += r)
     }
@@ -167,19 +187,37 @@ impl<T> ReadRef<T> {
     }
 }
 
-fn apply_update<D: Eq + Hash, R: Semigroup>(data: &mut HashMap<D, R>, k: D, v: R) {
+fn apply_hash_update<D: Eq + Hash, R: Semigroup>(data: &mut HashMap<D, R>, k: D, v: R) {
     if v.is_zero() {
         return;
     }
     match data.entry(k) {
-        Entry::Occupied(mut e) => {
+        hash_map::Entry::Occupied(mut e) => {
             let val = e.get_mut();
             *val += &v;
             if val.is_zero() {
                 e.remove_entry();
             }
         }
-        Entry::Vacant(e) => {
+        hash_map::Entry::Vacant(e) => {
+            e.insert(v);
+        }
+    }
+}
+
+fn apply_btree_update<D: Ord, R: Semigroup>(data: &mut BTreeMap<D, R>, k: D, v: R) {
+    if v.is_zero() {
+        return;
+    }
+    match data.entry(k) {
+        btree_map::Entry::Occupied(mut e) => {
+            let val = e.get_mut();
+            *val += &v;
+            if val.is_zero() {
+                e.remove_entry();
+            }
+        }
+        btree_map::Entry::Vacant(e) => {
             e.insert(v);
         }
     }
