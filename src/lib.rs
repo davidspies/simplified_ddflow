@@ -29,11 +29,11 @@ impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Semigroup>
 pub trait CreateOrderedOutput<D, R> {
     fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>>;
 }
-impl<G: Scope<Timestamp = usize>, D: Data + Ord, R: Semigroup> CreateOrderedOutput<D, R>
+impl<G: Scope<Timestamp = usize>, D: Data + Ord, R: Default + Semigroup> CreateOrderedOutput<D, R>
     for Collection<G, D, R>
 {
     fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>> {
-        self.create_updater(|data, d, r| apply_btree_update(data, d.clone(), r.clone()))
+        self.create_updater(|data, d, r| apply_btree_update(data, d.clone(), SG(r.clone())))
     }
 }
 

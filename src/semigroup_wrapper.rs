@@ -78,20 +78,27 @@ pub fn apply_hash_update<D: Eq + Hash, R: SemigroupWrapper>(
     }
 }
 
-pub fn apply_btree_update<D: Ord, R: Semigroup>(data: &mut BTreeMap<D, R>, k: D, v: R) {
+pub fn apply_btree_update<D: Ord, R: SemigroupWrapper>(
+    data: &mut BTreeMap<D, <R as SemigroupWrapper>::Wrapped>,
+    k: D,
+    v: R,
+) {
     if v.is_zero() {
         return;
     }
     match data.entry(k) {
         btree_map::Entry::Occupied(mut e) => {
             let val = e.get_mut();
-            *val += &v;
-            if val.is_zero() {
+            let mut valw = R::wrap(mem::replace(val, Default::default()));
+            valw.incorporate(v);
+            if valw.is_zero() {
                 e.remove_entry();
+            } else {
+                *val = valw.unwrap();
             }
         }
         btree_map::Entry::Vacant(e) => {
-            e.insert(v);
+            e.insert(v.unwrap());
         }
     }
 }
