@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
+use std::mem;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use timely::communication::{Allocator, WorkerGuards};
 use timely::dataflow::operators::probe::Handle;
@@ -144,8 +145,8 @@ fn create_updater<
     }
 }
 
-impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Semigroup> CreateHashedOutput<D, R>
-    for Collection<G, D, R>
+impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Semigroup>
+    CreateHashedOutput<D, R> for Collection<G, D, R>
 {
     fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>> {
         create_updater(self, |data, d, r| {
@@ -215,17 +216,17 @@ impl<D: Clone + Ord + Debug, R: Semigroup> ReadRef<HashMap<D, R>> {
 }
 
 trait SemigroupWrapper {
-    type Output;
+    type Output: Default;
 
     fn wrap(x: Self::Output) -> Self;
     fn unwrap(self) -> Self::Output;
-    fn is_zero(x: &Self::Output) -> bool;
-    fn incorporate(left: &mut Self::Output, right: Self::Output);
+    fn is_zero(&self) -> bool;
+    fn incorporate(&mut self, right: Self);
 }
 
 struct SG<T>(T);
 
-impl<T: Semigroup> SemigroupWrapper for SG<T> {
+impl<T: Default + Semigroup> SemigroupWrapper for SG<T> {
     type Output = T;
 
     fn wrap(x: Self::Output) -> Self {
@@ -234,11 +235,11 @@ impl<T: Semigroup> SemigroupWrapper for SG<T> {
     fn unwrap(self) -> Self::Output {
         self.0
     }
-    fn is_zero(x: &Self::Output) -> bool {
-        x.is_zero()
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
     }
-    fn incorporate(left: &mut Self::Output, right: Self::Output) {
-        *left += &right;
+    fn incorporate(&mut self, other: Self) {
+        (*self).0 += &other.0;
     }
 }
 
@@ -253,12 +254,12 @@ impl<K: Eq + Hash, V: SemigroupWrapper> SemigroupWrapper for SGH<K, V> {
     fn unwrap(self) -> Self::Output {
         self.0
     }
-    fn is_zero(x: &Self::Output) -> bool {
-        x.is_empty()
+    fn is_zero(&self) -> bool {
+        self.0.is_empty()
     }
-    fn incorporate(left: &mut Self::Output, right: Self::Output) {
-        for (k, v) in right.into_iter() {
-            apply_hash_update(left, k, V::wrap(v))
+    fn incorporate(&mut self, other: Self) {
+        for (k, v) in other.0.into_iter() {
+            apply_hash_update(&mut self.0, k, V::wrap(v))
         }
     }
 }
@@ -266,22 +267,24 @@ impl<K: Eq + Hash, V: SemigroupWrapper> SemigroupWrapper for SGH<K, V> {
 fn apply_hash_update<D: Eq + Hash, R: SemigroupWrapper>(
     data: &mut HashMap<D, <R as SemigroupWrapper>::Output>,
     k: D,
-    vw: R,
+    v: R,
 ) {
-    let v = R::unwrap(vw);
-    if R::is_zero(&v) {
+    if v.is_zero() {
         return;
     }
     match data.entry(k) {
         hash_map::Entry::Occupied(mut e) => {
             let val = e.get_mut();
-            R::incorporate(val, v);
-            if R::is_zero(val) {
+            let mut valw = R::wrap(mem::replace(val, Default::default()));
+            valw.incorporate(v);
+            if valw.is_zero() {
                 e.remove_entry();
+            } else {
+                *val = valw.unwrap();
             }
         }
         hash_map::Entry::Vacant(e) => {
-            e.insert(v);
+            e.insert(v.unwrap());
         }
     }
 }
