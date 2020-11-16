@@ -5,10 +5,10 @@ use std::iter::FromIterator;
 use std::mem;
 
 pub trait SemigroupWrapper {
-    type Output: Default;
+    type Wrapped: Default;
 
-    fn wrap(x: Self::Output) -> Self;
-    fn unwrap(self) -> Self::Output;
+    fn wrap(x: Self::Wrapped) -> Self;
+    fn unwrap(self) -> Self::Wrapped;
     fn is_zero(&self) -> bool;
     fn incorporate(&mut self, right: Self);
 }
@@ -16,12 +16,12 @@ pub trait SemigroupWrapper {
 pub struct SG<T>(pub T);
 
 impl<T: Default + Semigroup> SemigroupWrapper for SG<T> {
-    type Output = T;
+    type Wrapped = T;
 
-    fn wrap(x: Self::Output) -> Self {
+    fn wrap(x: Self::Wrapped) -> Self {
         SG(x)
     }
-    fn unwrap(self) -> Self::Output {
+    fn unwrap(self) -> Self::Wrapped {
         self.0
     }
     fn is_zero(&self) -> bool {
@@ -32,15 +32,15 @@ impl<T: Default + Semigroup> SemigroupWrapper for SG<T> {
     }
 }
 
-pub struct SGH<K, V: SemigroupWrapper>(pub HashMap<K, <V as SemigroupWrapper>::Output>);
+pub struct SGH<K, V: SemigroupWrapper>(pub HashMap<K, <V as SemigroupWrapper>::Wrapped>);
 
 impl<K: Eq + Hash, V: SemigroupWrapper> SemigroupWrapper for SGH<K, V> {
-    type Output = HashMap<K, <V as SemigroupWrapper>::Output>;
+    type Wrapped = HashMap<K, <V as SemigroupWrapper>::Wrapped>;
 
-    fn wrap(x: Self::Output) -> Self {
+    fn wrap(x: Self::Wrapped) -> Self {
         SGH(x)
     }
-    fn unwrap(self) -> Self::Output {
+    fn unwrap(self) -> Self::Wrapped {
         self.0
     }
     fn is_zero(&self) -> bool {
@@ -54,7 +54,7 @@ impl<K: Eq + Hash, V: SemigroupWrapper> SemigroupWrapper for SGH<K, V> {
 }
 
 pub fn apply_hash_update<D: Eq + Hash, R: SemigroupWrapper>(
-    data: &mut HashMap<D, <R as SemigroupWrapper>::Output>,
+    data: &mut HashMap<D, <R as SemigroupWrapper>::Wrapped>,
     k: D,
     v: R,
 ) {
@@ -97,7 +97,7 @@ pub fn apply_btree_update<D: Ord, R: Semigroup>(data: &mut BTreeMap<D, R>, k: D,
 }
 
 pub fn apply_map_update<K: Eq + Hash, V: Eq + Hash, R: SemigroupWrapper>(
-    data: &mut HashMap<K, HashMap<V, <R as SemigroupWrapper>::Output>>,
+    data: &mut HashMap<K, HashMap<V, <R as SemigroupWrapper>::Wrapped>>,
     k: (K, V),
     vw: R,
 ) {
