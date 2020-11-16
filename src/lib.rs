@@ -149,7 +149,7 @@ impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Semigroup> CreateHashe
 {
     fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>> {
         create_updater(self, |data, d, r| {
-            apply_hash_update(data, d.clone(), r.clone())
+            apply_hash_update(data, d.clone(), SG(r.clone()))
         })
     }
 }
@@ -179,7 +179,7 @@ impl<
 {
     fn create_map_output(&self) -> ReadRef<HashMap<K, HashMap<V, R>>> {
         create_updater(self, |data, d, r| {
-            apply_map_update(data, d.clone(), r.clone())
+            apply_map_update(data, d.clone(), SG(r.clone()))
         })
     }
 }
@@ -214,15 +214,69 @@ impl<D: Clone + Ord + Debug, R: Semigroup> ReadRef<HashMap<D, R>> {
     }
 }
 
-fn apply_hash_update<D: Eq + Hash, R: Semigroup>(data: &mut HashMap<D, R>, k: D, v: R) {
-    if v.is_zero() {
+trait SemigroupWrapper {
+    type Output;
+
+    fn wrap(x: Self::Output) -> Self;
+    fn unwrap(self) -> Self::Output;
+    fn is_zero(x: &Self::Output) -> bool;
+    fn incorporate(left: &mut Self::Output, right: Self::Output);
+}
+
+struct SG<T>(T);
+
+impl<T: Semigroup> SemigroupWrapper for SG<T> {
+    type Output = T;
+
+    fn wrap(x: Self::Output) -> Self {
+        SG(x)
+    }
+    fn unwrap(self) -> Self::Output {
+        self.0
+    }
+    fn is_zero(x: &Self::Output) -> bool {
+        x.is_zero()
+    }
+    fn incorporate(left: &mut Self::Output, right: Self::Output) {
+        *left += &right;
+    }
+}
+
+struct SGH<K, V: SemigroupWrapper>(HashMap<K, <V as SemigroupWrapper>::Output>);
+
+impl<K: Eq + Hash, V: SemigroupWrapper> SemigroupWrapper for SGH<K, V> {
+    type Output = HashMap<K, <V as SemigroupWrapper>::Output>;
+
+    fn wrap(x: Self::Output) -> Self {
+        SGH(x)
+    }
+    fn unwrap(self) -> Self::Output {
+        self.0
+    }
+    fn is_zero(x: &Self::Output) -> bool {
+        x.is_empty()
+    }
+    fn incorporate(left: &mut Self::Output, right: Self::Output) {
+        for (k, v) in right.into_iter() {
+            apply_hash_update(left, k, V::wrap(v))
+        }
+    }
+}
+
+fn apply_hash_update<D: Eq + Hash, R: SemigroupWrapper>(
+    data: &mut HashMap<D, <R as SemigroupWrapper>::Output>,
+    k: D,
+    vw: R,
+) {
+    let v = R::unwrap(vw);
+    if R::is_zero(&v) {
         return;
     }
     match data.entry(k) {
         hash_map::Entry::Occupied(mut e) => {
             let val = e.get_mut();
-            *val += &v;
-            if val.is_zero() {
+            R::incorporate(val, v);
+            if R::is_zero(val) {
                 e.remove_entry();
             }
         }
@@ -250,35 +304,14 @@ fn apply_btree_update<D: Ord, R: Semigroup>(data: &mut BTreeMap<D, R>, k: D, v: 
     }
 }
 
-fn apply_map_update<K: Eq + Hash, V: Eq + Hash, R: Semigroup>(
-    data: &mut HashMap<K, HashMap<V, R>>,
+fn apply_map_update<K: Eq + Hash, V: Eq + Hash, R: SemigroupWrapper>(
+    data: &mut HashMap<K, HashMap<V, <R as SemigroupWrapper>::Output>>,
     k: (K, V),
-    v: R,
+    vw: R,
 ) {
-    if v.is_zero() {
-        return;
-    }
-    match data.entry(k.0) {
-        hash_map::Entry::Occupied(mut e1) => {
-            let inner_map = e1.get_mut();
-            match inner_map.entry(k.1) {
-                hash_map::Entry::Occupied(mut e2) => {
-                    let val = e2.get_mut();
-                    *val += &v;
-                    if val.is_zero() {
-                        e2.remove_entry();
-                    }
-                }
-                hash_map::Entry::Vacant(e2) => {
-                    e2.insert(v);
-                }
-            }
-            if inner_map.is_empty() {
-                e1.remove_entry();
-            }
-        }
-        hash_map::Entry::Vacant(e) => {
-            e.insert(HashMap::from_iter(vec![(k.1, v)]));
-        }
-    }
+    apply_hash_update(
+        data,
+        k.0,
+        SGH::<V, R>(HashMap::from_iter(vec![(k.1, vw.unwrap())])),
+    )
 }
