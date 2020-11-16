@@ -3,6 +3,7 @@ use differential_dataflow::{input, Collection};
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use timely::communication::{Allocator, WorkerGuards};
@@ -116,6 +117,9 @@ pub trait CreateOrderedOutput<D, R> {
 pub trait CreateCountOutput<D, R> {
     fn create_count_output(&self) -> ReadRef<R>;
 }
+pub trait CreateMapOutput<K, V, R> {
+    fn create_map_output(&self) -> ReadRef<HashMap<K, HashMap<V, R>>>;
+}
 
 fn create_updater<
     G: Scope<Timestamp = usize>,
@@ -166,6 +170,20 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOu
     }
 }
 
+impl<
+        G: Scope<Timestamp = usize>,
+        K: Data + Eq + Hash,
+        V: Data + Eq + Hash,
+        R: Default + Semigroup,
+    > CreateMapOutput<K, V, R> for Collection<G, (K, V), R>
+{
+    fn create_map_output(&self) -> ReadRef<HashMap<K, HashMap<V, R>>> {
+        create_updater(self, |data, d, r| {
+            apply_map_update(data, d.clone(), r.clone())
+        })
+    }
+}
+
 pub struct ReadRef<D> {
     data: Arc<RwLock<D>>,
     handle: Handle<usize>,
@@ -184,6 +202,15 @@ impl<T> ReadRef<T> {
             }
         }
         self.data.read().unwrap()
+    }
+}
+
+impl<D: Clone + Ord + Debug, R: Semigroup> ReadRef<HashMap<D, R>> {
+    pub fn feedback(self: &Self, context: &mut Context, input: &InputSession<D, R>) {
+        let (mut context_input, context_output) = context.get_io();
+        for (k, v) in self.read(&context_output).iter() {
+            input.update(&mut context_input, k.clone(), v.clone());
+        }
     }
 }
 
@@ -219,6 +246,39 @@ fn apply_btree_update<D: Ord, R: Semigroup>(data: &mut BTreeMap<D, R>, k: D, v: 
         }
         btree_map::Entry::Vacant(e) => {
             e.insert(v);
+        }
+    }
+}
+
+fn apply_map_update<K: Eq + Hash, V: Eq + Hash, R: Semigroup>(
+    data: &mut HashMap<K, HashMap<V, R>>,
+    k: (K, V),
+    v: R,
+) {
+    if v.is_zero() {
+        return;
+    }
+    match data.entry(k.0) {
+        hash_map::Entry::Occupied(mut e1) => {
+            let inner_map = e1.get_mut();
+            match inner_map.entry(k.1) {
+                hash_map::Entry::Occupied(mut e2) => {
+                    let val = e2.get_mut();
+                    *val += &v;
+                    if val.is_zero() {
+                        e2.remove_entry();
+                    }
+                }
+                hash_map::Entry::Vacant(e2) => {
+                    e2.insert(v);
+                }
+            }
+            if inner_map.is_empty() {
+                e1.remove_entry();
+            }
+        }
+        hash_map::Entry::Vacant(e) => {
+            e.insert(HashMap::from_iter(vec![(k.1, v)]));
         }
     }
 }
