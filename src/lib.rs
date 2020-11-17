@@ -24,7 +24,7 @@ impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Semigroup>
     CreateHashedOutput<D, R> for Collection<G, D, R>
 {
     fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>, D, R> {
-        self.create_updater(|data, d, r| apply_hash_update(data, d.clone(), SG(r.clone())))
+        self.create_updater(|data, d, r| apply_hash_update(data, d, SG(r)))
     }
 }
 
@@ -35,7 +35,7 @@ impl<G: Scope<Timestamp = usize>, D: Data + Ord, R: Default + Semigroup> CreateO
     for Collection<G, D, R>
 {
     fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>, D, R> {
-        self.create_updater(|data, d, r| apply_btree_update(data, d.clone(), SG(r.clone())))
+        self.create_updater(|data, d, r| apply_btree_update(data, d, SG(r)))
     }
 }
 
@@ -46,7 +46,7 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOu
     for Collection<G, D, R>
 {
     fn create_count_output(&self) -> ReadRef<R, D, R> {
-        self.create_updater(|data, _, r| *data += r)
+        self.create_updater(|data, _, r| *data += &r)
     }
 }
 
@@ -61,7 +61,7 @@ impl<
     > CreateMapOutput<K, V, R> for Collection<G, (K, V), R>
 {
     fn create_map_output(&self) -> ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R> {
-        self.create_updater(|data, d, r| apply_map_update(data, d.clone(), SG(r.clone())))
+        self.create_updater(|data, d, r| apply_map_update(data, d, SG(r)))
     }
 }
 

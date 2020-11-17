@@ -118,7 +118,7 @@ impl<'a> Context<'a> {
 struct ReadRefInner<Y, D, R> {
     data: Y,
     pending_updates: BTreeMap<usize, Vec<(D, R)>>,
-    f: Box<dyn FnMut(&mut Y, &D, &R)>,
+    f: Box<dyn FnMut(&mut Y, D, R)>,
 }
 
 pub struct ReadRefRef<'a, Y, D, R>(RwLockReadGuard<'a, ReadRefInner<Y, D, R>>);
@@ -165,7 +165,7 @@ impl<Y, D, R> ReadRef<Y, D, R> {
             mem::swap(pending_updates, &mut popped);
             for (_, v) in popped {
                 for (d, r) in v {
-                    (*f)(data, &d, &r)
+                    (*f)(data, d, r)
                 }
             }
         }
@@ -174,7 +174,7 @@ impl<Y, D, R> ReadRef<Y, D, R> {
 }
 
 pub trait CreateUpdater<D, R> {
-    fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, &D, &R) + 'static>(
+    fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, D, R) + 'static>(
         &self,
         f: F,
     ) -> ReadRef<Y, D, R>;
@@ -183,7 +183,7 @@ pub trait CreateUpdater<D, R> {
 impl<G: Scope<Timestamp = usize>, D: Data, R: Semigroup> CreateUpdater<D, R>
     for Collection<G, D, R>
 {
-    fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, &D, &R) + 'static>(
+    fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, D, R) + 'static>(
         &self,
         f: F,
     ) -> ReadRef<Y, D, R> {
