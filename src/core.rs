@@ -111,16 +111,16 @@ impl<'a> Context<'a> {
     }
 }
 
-pub struct ReadRef<D> {
-    data: Arc<RwLock<D>>,
+pub struct ReadRef<Y> {
+    data: Arc<RwLock<Y>>,
     handle: Handle<usize>,
 }
 
-impl<T> ReadRef<T> {
+impl<Y> ReadRef<Y> {
     pub fn read<'c>(
         &'c self,
         ContextOutput(context): &'c ContextOutput, // Although not necessary to compile, this lifetime annotation is important since it prevents deadlock by making sure the output ref gets dropped before the next commit call.
-    ) -> RwLockReadGuard<'c, T> {
+    ) -> RwLockReadGuard<'c, Y> {
         if self.handle.less_than(&context.current_step) {
             // Avoid locking the worker if it's not necessary (yes this is double-checked locking, but I think it's fine here)
             let mut worker = context.worker.lock().unwrap();
