@@ -111,12 +111,13 @@ impl<'a> Context<'a> {
     }
 }
 
-pub struct ReadRef<Y> {
+pub struct ReadRef<Y, D, R> {
     data: Arc<RwLock<Y>>,
     handle: Handle<usize>,
+    phantom: PhantomData<(D, R)>,
 }
 
-impl<Y> ReadRef<Y> {
+impl<Y, D, R> ReadRef<Y, D, R> {
     pub fn read<'c>(
         &'c self,
         ContextOutput(context): &'c ContextOutput, // Although not necessary to compile, this lifetime annotation is important since it prevents deadlock by making sure the output ref gets dropped before the next commit call.
@@ -136,7 +137,7 @@ pub trait CreateUpdater<D, R> {
     fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, &D, &R) + 'static>(
         &self,
         f: F,
-    ) -> ReadRef<Y>;
+    ) -> ReadRef<Y, D, R>;
 }
 
 impl<G: Scope<Timestamp = usize>, D: Data, R: Semigroup> CreateUpdater<D, R>
@@ -145,7 +146,7 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Semigroup> CreateUpdater<D, R>
     fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, &D, &R) + 'static>(
         &self,
         mut f: F,
-    ) -> ReadRef<Y> {
+    ) -> ReadRef<Y, D, R> {
         let data = Arc::new(RwLock::new(Default::default()));
         let writer_ref = Arc::downgrade(&data);
         self.inspect(move |(d, _, r)| {
@@ -156,6 +157,7 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Semigroup> CreateUpdater<D, R>
         ReadRef {
             data,
             handle: self.probe(),
+            phantom: PhantomData,
         }
     }
 }
