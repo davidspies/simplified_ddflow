@@ -12,9 +12,11 @@ mod semigroup_wrapper;
 pub use crate::core::*;
 use semigroup_wrapper::*;
 
+pub type ReadMapRef<D, R> = ReadRef<HashMap<D, R>, D, R>;
+
 pub trait CreateHashedOutput<D, R> {
     fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>, D, R>;
-    fn create_output(&self) -> ReadRef<HashMap<D, R>, D, R> {
+    fn create_output(&self) -> ReadMapRef<D, R> {
         self.create_hashed_output()
     }
 }
@@ -63,7 +65,7 @@ impl<
     }
 }
 
-impl<D: Clone + Ord + Debug, R: Semigroup> ReadRef<HashMap<D, R>, D, R> {
+impl<D: Clone + Ord + Debug, R: Semigroup> ReadMapRef<D, R> {
     pub fn feedback(self: &Self, context: &mut Context, input: &InputSession<D, R>) {
         let (mut context_input, context_output) = context.get_io();
         for (k, v) in self.read(&context_output).iter() {
