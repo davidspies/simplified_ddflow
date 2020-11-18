@@ -85,12 +85,17 @@ impl<Y, D, R> ReadRef<Y, D, R> {
                 worker.step();
             }
         }
-        let read_data = self.data.read().unwrap();
-        if read_data.pending_updates.range(..cur_step).next().is_some() {
+        let data = &*self.data;
+        let needs_updating = {
+            // Must make sure this closes before calling `write` below
+            let read_data = data.read().unwrap();
+            read_data.pending_updates.range(..cur_step).next().is_some()
+        };
+        if needs_updating {
             // More double-checked locking
-            self.data.write().unwrap().advance_to(cur_step);
+            data.write().unwrap().advance_to(cur_step);
         }
-        ReadRefRef(self.data.read().unwrap())
+        ReadRefRef(data.read().unwrap())
     }
 }
 
