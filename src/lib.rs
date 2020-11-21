@@ -28,13 +28,32 @@ impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Semigroup>
     }
 }
 
+pub struct OrderedRef<D, R>(ReadRef<BTreeMap<D, R>, D, R>);
+pub struct OrderedRefRef<'b, D, R>(ReadRefRef<'b, BTreeMap<D, R>, D, R>);
+impl<D, R> OrderedRef<D, R> {
+    pub fn read<'b>(&'b self, context: &'b ContextOutput) -> OrderedRefRef<'b, D, R> {
+        OrderedRefRef(self.0.read(context))
+    }
+}
+impl<'b, D, R> OrderedRefRef<'b, D, R> {
+    pub fn min<'c>(&'c self) -> Option<&'c D> {
+        self.0.iter().next().map(|(x, _)| x)
+    }
+    pub fn max<'c>(&'c self) -> Option<&'c D> {
+        self.0.iter().next_back().map(|(x, _)| x)
+    }
+}
+
 pub trait CreateOrderedOutput<D, R> {
-    fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>, D, R>;
+    fn create_btree_output(&self) -> ReadRef<BTreeMap<D, R>, D, R>;
+    fn create_ordered_output(&self) -> OrderedRef<D, R> {
+        OrderedRef(self.create_btree_output())
+    }
 }
 impl<G: Scope<Timestamp = usize>, D: Data + Ord, R: Default + Semigroup> CreateOrderedOutput<D, R>
     for Collection<G, D, R>
 {
-    fn create_ordered_output(&self) -> ReadRef<BTreeMap<D, R>, D, R> {
+    fn create_btree_output(&self) -> ReadRef<BTreeMap<D, R>, D, R> {
         self.create_updater(|data, d, r| apply_btree_update(data, d, SG(r)))
     }
 }
