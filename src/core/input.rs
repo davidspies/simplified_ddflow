@@ -22,7 +22,7 @@ impl InputRegister {
     ) -> InputSession<D, R> {
         let sess = InputSessionInner(input::InputSession::new());
         let res = Arc::from(Mutex::new(sess));
-        self.0.send(res.clone()).unwrap_or_else(|_| ());
+        self.0.send(res.clone()).unwrap_or_default();
         InputSession(res)
     }
 }
