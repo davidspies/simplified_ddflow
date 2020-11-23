@@ -69,8 +69,10 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOu
     }
 }
 
+pub type ReadMapMapRef<K, V, R> = ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R>;
+
 pub trait CreateMapOutput<K, V, R> {
-    fn create_map_output(&self) -> ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R>;
+    fn create_map_output(&self) -> ReadMapMapRef<K, V, R>;
 }
 impl<
         G: Scope<Timestamp = usize>,
@@ -79,8 +81,22 @@ impl<
         R: Default + Semigroup,
     > CreateMapOutput<K, V, R> for Collection<G, (K, V), R>
 {
-    fn create_map_output(&self) -> ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R> {
+    fn create_map_output(&self) -> ReadMapMapRef<K, V, R> {
         self.create_updater(|data, d, r| apply_map_update(data, d, SG(r)))
+    }
+}
+
+pub type ReadOrderedMapRef<K, V, R> = ReadRef<BTreeMap<K, HashMap<V, R>>, (K, V), R>;
+
+pub trait CreateOrderedMapOutput<K, V, R> {
+    fn create_ordered_map_output(&self) -> ReadOrderedMapRef<K, V, R>;
+}
+
+impl<G: Scope<Timestamp = usize>, K: Data + Ord, V: Data + Eq + Hash, R: Default + Semigroup>
+    CreateOrderedMapOutput<K, V, R> for Collection<G, (K, V), R>
+{
+    fn create_ordered_map_output(&self) -> ReadOrderedMapRef<K, V, R> {
+        self.create_updater(|data, d, r| apply_btree_map_update(data, d, SG(r)))
     }
 }
 

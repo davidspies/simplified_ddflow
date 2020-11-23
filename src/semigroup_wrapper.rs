@@ -103,14 +103,22 @@ pub fn apply_btree_update<D: Ord, R: SemigroupWrapper>(
     }
 }
 
+fn singleton_hash_map<V: Eq + Hash, R: SemigroupWrapper>(k: V, vw: R) -> SGH<V, R> {
+    SGH::<V, R>(HashMap::from_iter(vec![(k, vw.unwrap())]))
+}
+
 pub fn apply_map_update<K: Eq + Hash, V: Eq + Hash, R: SemigroupWrapper>(
     data: &mut HashMap<K, HashMap<V, <R as SemigroupWrapper>::Wrapped>>,
     k: (K, V),
     vw: R,
 ) {
-    apply_hash_update(
-        data,
-        k.0,
-        SGH::<V, R>(HashMap::from_iter(vec![(k.1, vw.unwrap())])),
-    )
+    apply_hash_update(data, k.0, singleton_hash_map(k.1, vw))
+}
+
+pub fn apply_btree_map_update<K: Ord, V: Eq + Hash, R: SemigroupWrapper>(
+    data: &mut BTreeMap<K, HashMap<V, <R as SemigroupWrapper>::Wrapped>>,
+    k: (K, V),
+    vw: R,
+) {
+    apply_btree_update(data, k.0, singleton_hash_map(k.1, vw))
 }
