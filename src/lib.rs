@@ -86,9 +86,8 @@ impl<
 
 impl<D: Clone + Ord + Debug, R: Semigroup> ReadMapRef<D, R> {
     pub fn feedback(self: &Self, context: &mut Context, input: &InputSession<D, R>) {
-        let (mut context_input, context_output) = context.get_io();
-        for (k, v) in self.read(&context_output).iter() {
-            input.update(&mut context_input, k.clone(), v.clone());
+        for (k, v) in self.read(&context.get_output()).iter() {
+            input.update(&context.get_input(), k.clone(), v.clone());
         }
     }
 }

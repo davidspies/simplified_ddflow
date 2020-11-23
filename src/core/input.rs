@@ -1,6 +1,7 @@
 use differential_dataflow::difference::Semigroup;
 use differential_dataflow::{input, Collection};
 use std::fmt::Debug;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use timely::dataflow::scopes::Scope;
 
@@ -8,22 +9,20 @@ struct InputSessionInner<D: Clone + Ord + Debug + 'static, R: Semigroup>(
     input::InputSession<usize, D, R>,
 );
 
-pub struct InputRegister(Vec<Arc<Mutex<dyn Registerable>>>);
+pub struct InputRegister(Sender<Arc<Mutex<dyn Registerable>>>);
 
-pub fn new_input_register() -> InputRegister {
-    InputRegister(Vec::new())
-}
-pub fn get_registered_inputs(r: &InputRegister) -> &Vec<Arc<Mutex<dyn Registerable>>> {
-    &r.0
+pub fn new_input_register() -> (InputRegister, Receiver<Arc<Mutex<dyn Registerable>>>) {
+    let (sender, receiver) = mpsc::channel();
+    (InputRegister(sender), receiver)
 }
 
 impl InputRegister {
     pub fn create_input<D: Clone + Ord + Debug + 'static, R: Semigroup>(
-        &mut self,
+        &self,
     ) -> InputSession<D, R> {
         let sess = InputSessionInner(input::InputSession::new());
         let res = Arc::from(Mutex::new(sess));
-        self.0.push(res.clone());
+        self.0.send(res.clone()).unwrap_or_else(|_| ());
         InputSession(res)
     }
 }
@@ -50,13 +49,13 @@ impl<D: Clone + Ord + Debug, R: Semigroup> InputSession<D, R> {
     pub fn to_collection<G: Scope<Timestamp = usize>>(&self, scope: &mut G) -> Collection<G, D, R> {
         self.with_inner(|i| i.to_collection(scope))
     }
-    pub fn update(&self, _: &mut ContextInput, element: D, change: R) {
+    pub fn update(&self, _: &ContextInput, element: D, change: R) {
         self.with_inner(|i| i.update(element, change))
     }
 }
 
 impl<D: Clone + Ord + Debug> InputSession<D, isize> {
-    pub fn insert(&self, _: &mut ContextInput, element: D) {
+    pub fn insert(&self, _: &ContextInput, element: D) {
         self.with_inner(|i| i.insert(element))
     }
 }

@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use timely::communication::{Allocator, WorkerGuards};
 use timely::dataflow::scopes::Child;
 use timely::worker::Worker;
@@ -21,12 +22,15 @@ where
     G: Fn(&mut Context, T1) -> T2 + Send + Sync + 'static,
 {
     timely::execute_from_args(iter, move |worker| {
-        let mut register = new_input_register();
-        let structures = worker.dataflow(|scope| setup(scope, &mut register));
+        let (receiver, structures) = {
+            let (mut register, receiver) = new_input_register();
+            let structures = worker.dataflow(|scope| setup(scope, &mut register));
+            (receiver, structures)
+        };
         let mut context = Context {
             input: new_context_input(),
             output: new_context_output(worker),
-            register,
+            registered: receiver.iter().collect(),
         };
         execute(&mut context, structures)
     })
@@ -35,22 +39,19 @@ where
 pub struct Context<'a> {
     input: ContextInput,
     output: ContextOutput<'a>,
-    register: InputRegister,
+    registered: Vec<Arc<Mutex<dyn Registerable>>>,
 }
 
 impl<'a> Context<'a> {
-    pub fn get_io<'b>(&'b mut self) -> (&'b mut ContextInput, &'b ContextOutput<'a>) {
-        (&mut self.input, &self.output)
-    }
-    pub fn get_input<'b>(&'b mut self) -> &'b mut ContextInput {
-        &mut self.input
+    pub fn get_input<'b>(&'b self) -> &'b ContextInput {
+        &self.input
     }
     pub fn get_output<'b>(&'b self) -> &'b ContextOutput<'a> {
         &self.output
     }
     pub fn commit(&mut self) {
         increment_step(&mut self.output);
-        for r in get_registered_inputs(&self.register) {
+        for r in self.registered.iter() {
             r.lock().unwrap().advance_to(get_current_step(&self.output));
         }
     }
