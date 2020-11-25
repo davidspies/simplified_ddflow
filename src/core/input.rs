@@ -38,7 +38,7 @@ impl<D: Clone + Ord + Debug, R: Semigroup> Registerable for InputSessionInner<D,
     }
 }
 
-pub struct InputSession<D: Clone + Ord + Debug + 'static, R: Semigroup>(
+pub struct InputSession<D: Clone + Ord + Debug + 'static, R: Semigroup = isize>(
     Arc<Mutex<InputSessionInner<D, R>>>,
 );
 

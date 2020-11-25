@@ -58,7 +58,7 @@ impl<Y, D, R> ReadRefInner<Y, D, R> {
     }
 }
 
-pub struct ReadRefRef<'a, Y, D, R>(RwLockReadGuard<'a, ReadRefInner<Y, D, R>>);
+pub struct ReadRefRef<'a, Y, D, R = isize>(RwLockReadGuard<'a, ReadRefInner<Y, D, R>>);
 
 impl<Y, D, R> Deref for ReadRefRef<'_, Y, D, R> {
     type Target = Y;
@@ -67,7 +67,7 @@ impl<Y, D, R> Deref for ReadRefRef<'_, Y, D, R> {
     }
 }
 
-pub struct ReadRef<Y, D, R> {
+pub struct ReadRef<Y, D, R = isize> {
     data: Arc<RwLock<ReadRefInner<Y, D, R>>>,
     handle: Handle<usize>,
 }
@@ -99,7 +99,7 @@ impl<Y, D, R> ReadRef<Y, D, R> {
     }
 }
 
-pub trait CreateUpdater<D, R> {
+pub trait CreateUpdater<D, R = isize> {
     fn create_updater<Y: Default + 'static, F: FnMut(&mut Y, D, R) + 'static>(
         &self,
         f: F,

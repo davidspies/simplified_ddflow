@@ -12,9 +12,9 @@ mod semigroup_wrapper;
 pub use crate::core::*;
 use semigroup_wrapper::*;
 
-pub type ReadMapRef<D, R> = ReadRef<HashMap<D, R>, D, R>;
+pub type ReadMapRef<D, R = isize> = ReadRef<HashMap<D, R>, D, R>;
 
-pub trait CreateHashedOutput<D, R> {
+pub trait CreateHashedOutput<D, R = isize> {
     fn create_hashed_output(&self) -> ReadRef<HashMap<D, R>, D, R>;
     fn create_output(&self) -> ReadMapRef<D, R> {
         self.create_hashed_output()
@@ -28,8 +28,8 @@ impl<G: Scope<Timestamp = usize>, D: Data + Eq + Hash, R: Default + Semigroup>
     }
 }
 
-pub struct OrderedRef<D, R>(ReadRef<BTreeMap<D, R>, D, R>);
-pub struct OrderedRefRef<'b, D, R>(ReadRefRef<'b, BTreeMap<D, R>, D, R>);
+pub struct OrderedRef<D, R = isize>(ReadRef<BTreeMap<D, R>, D, R>);
+pub struct OrderedRefRef<'b, D, R = isize>(ReadRefRef<'b, BTreeMap<D, R>, D, R>);
 impl<D, R> OrderedRef<D, R> {
     pub fn read<'b>(&'b self, context: &'b ContextOutput) -> OrderedRefRef<'b, D, R> {
         OrderedRefRef(self.0.read(context))
@@ -44,7 +44,7 @@ impl<'b, D, R> OrderedRefRef<'b, D, R> {
     }
 }
 
-pub trait CreateOrderedOutput<D, R> {
+pub trait CreateOrderedOutput<D, R = isize> {
     fn create_btree_output(&self) -> ReadRef<BTreeMap<D, R>, D, R>;
     fn create_ordered_output(&self) -> OrderedRef<D, R> {
         OrderedRef(self.create_btree_output())
@@ -58,7 +58,7 @@ impl<G: Scope<Timestamp = usize>, D: Data + Ord, R: Default + Semigroup> CreateO
     }
 }
 
-pub trait CreateCountOutput<D, R> {
+pub trait CreateCountOutput<D, R = isize> {
     fn create_count_output(&self) -> ReadRef<R, D, R>;
 }
 impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOutput<D, R>
@@ -69,9 +69,9 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOu
     }
 }
 
-pub type ReadMapMapRef<K, V, R> = ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R>;
+pub type ReadMapMapRef<K, V, R = isize> = ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R>;
 
-pub trait CreateMapOutput<K, V, R> {
+pub trait CreateMapOutput<K, V, R = isize> {
     fn create_map_output(&self) -> ReadMapMapRef<K, V, R>;
 }
 impl<
@@ -86,9 +86,9 @@ impl<
     }
 }
 
-pub type ReadOrderedMapRef<K, V, R> = ReadRef<BTreeMap<K, HashMap<V, R>>, (K, V), R>;
+pub type ReadOrderedMapRef<K, V, R = isize> = ReadRef<BTreeMap<K, HashMap<V, R>>, (K, V), R>;
 
-pub trait CreateOrderedMapOutput<K, V, R> {
+pub trait CreateOrderedMapOutput<K, V, R = isize> {
     fn create_ordered_map_output(&self) -> ReadOrderedMapRef<K, V, R>;
 }
 
