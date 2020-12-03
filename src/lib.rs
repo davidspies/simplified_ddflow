@@ -273,27 +273,43 @@ impl<'a, D> Iterator for DistinctIter<'a, D> {
     }
 }
 
-pub trait Assert1s<'a, K>: Iterator<Item = (K, &'a isize)> {
+pub trait Has1 {
+    fn assert_one(self);
+}
+
+impl Has1 for isize {
+    fn assert_one(self) {
+        assert_eq!(self, 1)
+    }
+}
+
+impl<'a> Has1 for &'a isize {
+    fn assert_one(self) {
+        assert_eq!(*self, 1)
+    }
+}
+
+pub trait Assert1s<K, R: Has1>: Iterator<Item = (K, R)> {
     type Output: Iterator<Item = K>;
 
     fn assert_ones(self) -> Self::Output;
 }
 
-pub struct Assert1sImpl<'a, I: Iterator<Item = (K, &'a isize)>, K>(I);
+pub struct Assert1sImpl<I: Iterator<Item = (K, R)>, K, R>(I);
 
-impl<'a, I: Iterator<Item = (K, &'a isize)>, K> Iterator for Assert1sImpl<'a, I, K> {
+impl<I: Iterator<Item = (K, R)>, K, R: Has1> Iterator for Assert1sImpl<I, K, R> {
     type Item = K;
 
     fn next(&mut self) -> Option<K> {
-        self.0.next().map(|(k, &v)| {
-            assert_eq!(v, 1);
+        self.0.next().map(|(k, v)| {
+            v.assert_one();
             k
         })
     }
 }
 
-impl<'a, I: Iterator<Item = (K, &'a isize)>, K> Assert1s<'a, K> for I {
-    type Output = Assert1sImpl<'a, I, K>;
+impl<I: Iterator<Item = (K, R)>, K, R: Has1> Assert1s<K, R> for I {
+    type Output = Assert1sImpl<I, K, R>;
 
     fn assert_ones(self) -> Self::Output {
         Assert1sImpl(self)
