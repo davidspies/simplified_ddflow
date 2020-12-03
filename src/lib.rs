@@ -171,9 +171,10 @@ impl<K: Eq + Hash, V> SingletonMapRef<'_, K, V> {
 }
 
 fn get_singleton<K>(vmap: &HashMap<K, isize>) -> &K {
-    match vmap.iter().next() {
+    let mut iter = vmap.iter();
+    match iter.next() {
         Some((x, &r)) => {
-            if vmap.iter().next().is_some() {
+            if iter.next().is_some() {
                 panic!("Too many elements")
             } else if r != 1 {
                 panic!("Bad count")
