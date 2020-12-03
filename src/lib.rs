@@ -272,3 +272,30 @@ impl<'a, D> Iterator for DistinctIter<'a, D> {
         })
     }
 }
+
+pub trait Assert1s<'a, K>: Iterator<Item = (K, &'a isize)> {
+    type Output: Iterator<Item = K>;
+
+    fn assert_ones(self) -> Self::Output;
+}
+
+pub struct Assert1sImpl<'a, I: Iterator<Item = (K, &'a isize)>, K>(I);
+
+impl<'a, I: Iterator<Item = (K, &'a isize)>, K> Iterator for Assert1sImpl<'a, I, K> {
+    type Item = K;
+
+    fn next(&mut self) -> Option<K> {
+        self.0.next().map(|(k, &v)| {
+            assert_eq!(v, 1);
+            k
+        })
+    }
+}
+
+impl<'a, I: Iterator<Item = (K, &'a isize)>, K> Assert1s<'a, K> for I {
+    type Output = Assert1sImpl<'a, I, K>;
+
+    fn assert_ones(self) -> Self::Output {
+        Assert1sImpl(self)
+    }
+}
