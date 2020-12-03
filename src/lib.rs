@@ -70,10 +70,10 @@ impl<G: Scope<Timestamp = usize>, D: Data, R: Default + Semigroup> CreateCountOu
     }
 }
 
-pub type UndefaultedMap<K, V, R = isize> = ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R>;
+type UndefaultedMap<K, V, R = isize> = ReadRef<HashMap<K, HashMap<V, R>>, (K, V), R>;
 
 pub trait CreateMapOutput<K, V, R = isize> {
-    fn create_map_output(&self) -> ReadMapMapRef<K, V, R>;
+    fn create_map_map_output(&self) -> ReadMapMapRef<K, V, R>;
 }
 impl<
         G: Scope<Timestamp = usize>,
@@ -82,16 +82,28 @@ impl<
         R: Default + Semigroup,
     > CreateMapOutput<K, V, R> for Collection<G, (K, V), R>
 {
-    fn create_map_output(&self) -> ReadMapMapRef<K, V, R> {
+    fn create_map_map_output(&self) -> ReadMapMapRef<K, V, R> {
         self.create_updater(|data, d, r| apply_map_update(data, d, SG(r)))
             .with_default()
+    }
+}
+
+pub trait CreateSingletonMapOutput<K, V> {
+    fn create_singleton_map_output(&self) -> SingletonMap<K, V>;
+}
+impl<G: Scope<Timestamp = usize>, K: Data + Eq + Hash, V: Data + Eq + Hash>
+    CreateSingletonMapOutput<K, V> for Collection<G, (K, V)>
+{
+    fn create_singleton_map_output(&self) -> SingletonMap<K, V> {
+        self.create_updater(|data, d, r| apply_map_update(data, d, SG(r)))
+            .singleton_map()
     }
 }
 
 pub struct ReadMapMapRef<K, V, R = isize>(UndefaultedMap<K, V, R>);
 
 impl<K, V, R> UndefaultedMap<K, V, R> {
-    pub fn with_default(self) -> ReadMapMapRef<K, V, R> {
+    fn with_default(self) -> ReadMapMapRef<K, V, R> {
         ReadMapMapRef(self)
     }
 }
@@ -141,7 +153,7 @@ impl<'a, K, V, R> IntoIterator for &'a DefaultedRef<'_, K, V, R> {
 pub struct SingletonMap<K, V>(UndefaultedMap<K, V>);
 
 impl<K, V> UndefaultedMap<K, V> {
-    pub fn singleton_map(self) -> SingletonMap<K, V> {
+    fn singleton_map(self) -> SingletonMap<K, V> {
         SingletonMap(self)
     }
 }
