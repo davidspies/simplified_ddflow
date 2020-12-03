@@ -229,50 +229,6 @@ impl<D: Clone + Ord + Debug, R: Semigroup> ReadMapRef<D, R> {
     }
 }
 
-pub struct Distinct<D>(ReadMapRef<D>);
-
-impl<D> ReadMapRef<D> {
-    pub fn assert_distinct(self) -> Distinct<D> {
-        Distinct(self)
-    }
-}
-
-pub struct DistinctRef<'a, D>(ReadRefRef<'a, HashMap<D, isize>, D>);
-
-impl<D: Eq + Hash> DistinctRef<'_, D> {
-    pub fn contains(&self, k: &D) -> bool {
-        match self.0.get(k) {
-            None => false,
-            Some(&r) => {
-                assert_eq!(r, 1);
-                true
-            }
-        }
-    }
-}
-
-impl<'a, D> IntoIterator for &'a DistinctRef<'_, D> {
-    type Item = &'a D;
-    type IntoIter = DistinctIter<'a, D>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        DistinctIter(self.0.iter())
-    }
-}
-
-pub struct DistinctIter<'a, D>(hash_map::Iter<'a, D, isize>);
-
-impl<'a, D> Iterator for DistinctIter<'a, D> {
-    type Item = &'a D;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|(k, &v)| {
-            assert_eq!(v, 1);
-            k
-        })
-    }
-}
-
 pub trait Has1 {
     fn assert_one(self);
 }
